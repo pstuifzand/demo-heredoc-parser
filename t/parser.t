@@ -4,7 +4,7 @@ use Demo::Heredoc::Parser;
 my $p = Demo::Heredoc::Parser->new;
 
 my $v = $p->parse(<<"INPUT");
-<<ENDA,<<ENDB,<<ENDC;
+<<ENDA, <<ENDB, <<ENDC;
 line 1
 line 2
 line 3

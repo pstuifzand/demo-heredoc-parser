@@ -29,8 +29,8 @@ newline         ~ [\n]
 literal         ~ [.]
 comma           ~ ','
 
-#:discard        ~ ws
-#ws              ~ [\s]+
+:discard        ~ ws
+ws              ~ [ \t]+
 
 GRAMMAR
     });
@@ -45,7 +45,7 @@ sub parse {
     my ($self, $input) = @_;
     my %options = (
         #trace_values    => 1,
-        trace_terminals => 1,
+        #trace_terminals => 1,
     );
 
     my $re = Marpa::R2::Scanless::R->new({ %options, grammar => $self->{grammar} });
