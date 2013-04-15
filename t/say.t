@@ -19,6 +19,9 @@ ENDC
 line 8
 line 9
 ENDD
+say <<ENDE;
+ENDE
+
 INPUT
 
 my $expected = 
@@ -36,6 +39,13 @@ my $expected =
         [
             'say', [
                 "line 8\nline 9\n",
+            ],
+        ],
+    ],
+    [
+        [
+            'say', [
+                "",
             ],
         ],
     ]
