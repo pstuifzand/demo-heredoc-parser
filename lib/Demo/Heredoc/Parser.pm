@@ -10,15 +10,15 @@ sub new {
 
         source => \<<'GRAMMAR',
 
-:start        ::= file
+:start        ::= statements
 
-file          ::= expressions         (semi_colon newline)   action => ::first
+statements    ::= statement+
+statement     ::= expressions semi_colon action => ::first
+                | newline
 
-expressions   ::= expression+          separator => comma
-
-expression    ::= heredoc              action => ::first
-
-heredoc       ::= (marker) literal     action => ::first
+expressions   ::= expression+            separator => comma
+expression    ::= heredoc                action => ::first
+heredoc       ::= (marker) literal       action => ::first
 
 :lexeme         ~ marker     pause => before
 :lexeme         ~ newline    pause => before
@@ -70,8 +70,8 @@ sub parse {
         }
         elsif ($input =~ m/\G\n/gmsc) {
             my $p = $last_heredoc_end;
-            $last_heredoc_end = undef;
-            $re->lexeme_read('newline', $pos, 1, "\n");
+            undef $last_heredoc_end;
+            #$re->lexeme_read('newline', $pos, 0, "");
             $pos = $re->resume($p);
         }
     }
