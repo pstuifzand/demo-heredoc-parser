@@ -48,5 +48,15 @@ my $expected = [
 ];
 is_deeply($v, $expected);
 
+my $v = $p->parse(<<"INPUT");
+<<ENDA;
+ENDA
+INPUT
+
+my $expected = [[
+    "",
+]];
+is_deeply($v, $expected);
+
 done_testing();
 

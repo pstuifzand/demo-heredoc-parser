@@ -90,7 +90,7 @@ sub parse {
             pos($input) = $last_heredoc_end;
 
             # Find the literal text between the end of the last heredoc and the marker
-            if (my ($literal) = $input =~ m/\G(.+)^$name\n/gmsc) {
+            if (my ($literal) = $input =~ m/\G(.*)^$name\n/gmsc) {
                 # If found, pass the lexemes to the parser so it knows what we found
                 $re->lexeme_read('marker', $pos, 2, '<<') // die $re->show_progress;
                 $re->lexeme_read('literal', $last_heredoc_end, length($literal), $literal) // die $re->show_progress;
