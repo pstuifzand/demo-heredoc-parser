@@ -5,6 +5,7 @@ use Data::Dumper;
 
 sub new {
     my $class = shift;
+
     my $grammar = Marpa::R2::Scanless::G->new({
         default_action => '::array',
 
@@ -13,23 +14,40 @@ sub new {
 :start        ::= statements
 
 statements    ::= statement+
+
+# Statement should handle their own semi_colons
+
 statement     ::= expressions semi_colon action => ::first
                 | newline
 
 expressions   ::= expression+            separator => comma
+
 expression    ::= heredoc                action => ::first
                 | 'say' expressions
 
+# The heredoc rule is different from how the source code actually looks The
+# pause adverb allows to send only the parts the are useful
+
 heredoc       ::= (marker) literal       action => ::first
 
+# Pause at the marker and at newlines. Pausing at the newline will
+# actually pause the parser at every newline
 :lexeme         ~ marker     pause => before
 :lexeme         ~ newline    pause => before
 
 marker          ~ '<<'
 semi_colon      ~ ';'
 newline         ~ [\n]
+
+# The literal lexeme will always be provided by the external heredoc scanner So
+# this could be anything.
+
 literal         ~ [.]
+
 comma           ~ ','
+
+# Only discard horizontal whitespace. If "\n" is included the parser won't
+# pause at the end of line.
 
 :discard        ~ ws
 ws              ~ [ \t]+
@@ -40,6 +58,7 @@ GRAMMAR
     my $self = {
         grammar => $grammar,
     };
+
     return bless $self, $class;
 }
 
