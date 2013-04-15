@@ -19,6 +19,7 @@ statement     ::= expressions semi_colon action => ::first
 expressions   ::= expression+            separator => comma
 expression    ::= heredoc                action => ::first
                 | 'say' expressions
+
 heredoc       ::= (marker) literal       action => ::first
 
 :lexeme         ~ marker     pause => before
@@ -44,38 +45,55 @@ GRAMMAR
 
 sub parse {
     my ($self, $input) = @_;
-    my %options = (
-        #trace_values    => 1,
-        #trace_terminals => 1,
-    );
 
-    my $re = Marpa::R2::Scanless::R->new({ %options, grammar => $self->{grammar} });
+    my $re = Marpa::R2::Scanless::R->new({ grammar => $self->{grammar} });
+
+    # Start the parse
     my $pos = $re->read(\$input);
     die "error" if $pos < 0;
 
     my $last_heredoc_end;
 
+    # Loop while the parse has't moved past the end
     while ($pos < length $input) {
+        # Set pos of $input for \G
         pos($input) = $pos;
 
+        # Find the end of the line
         $last_heredoc_end //= index($input, "\n", $pos) + 1;
 
+        # Parse the start of a heredoc
         if (my ($name) = $input =~ m/\G<<(\w+)/msgc) {
-            my $s = pos($input);
+            # Save the position where the heredoc marker ends
+            my $last_parse_end = pos($input);
+
+            # Set pos of $input to the end of the previous heredoc
             pos($input) = $last_heredoc_end;
+
+            # Find the literal text between the end of the last heredoc and the marker
             if (my ($literal) = $input =~ m/\G(.+)^$name\n/gmsc) {
+                # If found, pass the lexemes to the parser so it knows what we found
                 $re->lexeme_read('marker', $pos, 2, '<<') // die $re->show_progress;
                 $re->lexeme_read('literal', $last_heredoc_end, length($literal), $literal) // die $re->show_progress;
+
+                # Save of the position of the end of the match
+                # The next heredoc literal starts there if there is one
                 $last_heredoc_end = pos($input);
-                $pos = $re->resume($s);
+
+                # Resume parsing from where we last paused
+                $pos = $re->resume($last_parse_end);
             }
             else {
                 die "Heredoc marker $name not found before end of input";
             }
         }
-        elsif ($input =~ m/\G\n/gmsc) {
+        # Match end of the line
+        elsif ($input =~ m/\G$/gmsc) {
+            # Cleanup for the next line with heredoc markers.
             my $p = $last_heredoc_end;
             undef $last_heredoc_end;
+
+            # Resume from the end of the last heredoc.
             $pos = $re->resume($p);
         }
     }
