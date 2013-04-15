@@ -18,6 +18,7 @@ statement     ::= expressions semi_colon action => ::first
 
 expressions   ::= expression+            separator => comma
 expression    ::= heredoc                action => ::first
+                | 'say' expressions
 heredoc       ::= (marker) literal       action => ::first
 
 :lexeme         ~ marker     pause => before
@@ -71,7 +72,6 @@ sub parse {
         elsif ($input =~ m/\G\n/gmsc) {
             my $p = $last_heredoc_end;
             undef $last_heredoc_end;
-            #$re->lexeme_read('newline', $pos, 0, "");
             $pos = $re->resume($p);
         }
     }
