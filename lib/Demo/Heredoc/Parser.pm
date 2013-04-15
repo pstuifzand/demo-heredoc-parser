@@ -63,11 +63,15 @@ sub parse {
         if (my ($name) = $input =~ m/\G<<(\w+)/msgc) {
             my $s = pos($input);
             pos($input) = $last_heredoc_end;
-            my ($literal) = $input =~ m/\G(.+)^$name\n/gmsc;
-            $re->lexeme_read('marker', $pos, 2, '<<') // die $re->show_progress;
-            $re->lexeme_read('literal', $last_heredoc_end, length($literal), $literal) // die $re->show_progress;
-            $last_heredoc_end = pos($input);
-            $pos = $re->resume($s);
+            if (my ($literal) = $input =~ m/\G(.+)^$name\n/gmsc) {
+                $re->lexeme_read('marker', $pos, 2, '<<') // die $re->show_progress;
+                $re->lexeme_read('literal', $last_heredoc_end, length($literal), $literal) // die $re->show_progress;
+                $last_heredoc_end = pos($input);
+                $pos = $re->resume($s);
+            }
+            else {
+                die "Heredoc marker $name not found before end of input";
+            }
         }
         elsif ($input =~ m/\G\n/gmsc) {
             my $p = $last_heredoc_end;
