@@ -1,7 +1,9 @@
 package Demo::Heredoc::Parser;
+
 use 5.10.0;
-use Marpa::R2 '2.051_010';
-use Data::Dumper;
+use strict;
+use warnings;
+use Marpa::R2 '2.052000';
 
 sub new {
     my $class = shift;
