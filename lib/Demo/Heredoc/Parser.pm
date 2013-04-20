@@ -34,20 +34,18 @@ heredoc       ::= (marker) literal       action => ::first
 
 # Pause at the marker and at newlines. Pausing at the newline will
 # actually pause the parser at every newline
-:lexeme         ~ marker     pause => after
+:lexeme         ~ literal    pause => before
 :lexeme         ~ newline    pause => before
 
 marker          ~ '<<'
 semi_colon      ~ ';'
+comma           ~ ','
 newline         ~ [\n]
 
-# The literal lexeme will always be provided by the external heredoc scanner.
-# Set it to a value which will never match.
-
-literal         ~ unicorn
-unicorn         ~ [^\s\S]
-
-comma           ~ ','
+# The actual value of the literal lexeme will
+# be provided by the external heredoc scanner.
+# The syntax here is for the heredoc marker
+literal         ~ [\w]+
 
 # Only discard horizontal whitespace. If "\n" is included the parser won't
 # pause at the end of line.
@@ -82,15 +80,14 @@ sub parse {
         my $lexeme = $re->pause_lexeme();
         my ( $start_of_pause_lexeme, $length_of_pause_lexeme ) =
             $re->pause_span();
+        my $end_of_pause_lexeme = $start_of_pause_lexeme + $length_of_pause_lexeme;
 
         if ( $re->pause_lexeme() eq 'newline' ) {
 
             # Resume from the end of the last heredoc, if there
             # was one.  Otherwise just resume at the start of the
             # next line.
-            $pos =
-                $re->resume( $last_heredoc_end
-                    // ( $start_of_pause_lexeme + $length_of_pause_lexeme ) );
+            $pos = $re->resume( $last_heredoc_end // $end_of_pause_lexeme );
             $last_heredoc_end = undef;
             next PARSE_SEGMENT;
         } ## end if ( $re->pause_lexeme() eq 'newline' )
@@ -101,10 +98,7 @@ sub parse {
         pos($input) = $pos;
 
         # Parse the start of a heredoc
-        my ($name) = ( $input =~ m/\G(\w+)/msgc );
-
-        # Save the position where the heredoc marker ends
-        my $saved_parse_position = pos $input;
+        my $name = $re->literal($start_of_pause_lexeme, $length_of_pause_lexeme);
 
         my $heredoc_start = $last_heredoc_end
             // ( index( $input, "\n", $pos ) + 1 );
@@ -126,7 +120,7 @@ sub parse {
         $last_heredoc_end = pos $input;
 
         # Resume parsing from where we last paused
-        $pos = $re->resume($saved_parse_position);
+        $pos = $re->resume($end_of_pause_lexeme);
 
     } ## end PARSE_SEGMENT: while ( $pos < length $input )
 
