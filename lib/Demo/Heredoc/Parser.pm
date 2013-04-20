@@ -82,7 +82,7 @@ sub parse {
 	my $lexeme = $re->pause_lexeme() ;
 	my ($start_of_pause_lexeme, $length_of_pause_lexeme) = $re->pause_span();
 
-	say STDERR 'lexeme @', join q{ }, $start_of_pause_lexeme, $length_of_pause_lexeme, $lexeme;
+	# say STDERR 'lexeme @', join q{ }, $start_of_pause_lexeme, $length_of_pause_lexeme, $lexeme;
 
 	if ($re->pause_lexeme() eq 'newline') {
 	    # Resume from the end of the last heredoc.
