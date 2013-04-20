@@ -66,67 +66,72 @@ GRAMMAR
 }
 
 sub parse {
-    my ($self, $input) = @_;
+    my ( $self, $input ) = @_;
 
-    my $re = Marpa::R2::Scanless::R->new({ grammar => $self->{grammar} });
+    my $re = Marpa::R2::Scanless::R->new( { grammar => $self->{grammar} } );
 
     # Start the parse
-    my $pos = $re->read(\$input);
+    my $pos = $re->read( \$input );
     die "error" if $pos < 0;
 
     my $last_heredoc_end;
 
     # Loop while the parse has't moved past the end
-    PARSE_SEGMENT: while ($pos < length $input) {
+    PARSE_SEGMENT: while ( $pos < length $input ) {
 
-	my $lexeme = $re->pause_lexeme() ;
-	my ($start_of_pause_lexeme, $length_of_pause_lexeme) = $re->pause_span();
+        my $lexeme = $re->pause_lexeme();
+        my ( $start_of_pause_lexeme, $length_of_pause_lexeme ) =
+            $re->pause_span();
 
-	# say STDERR 'lexeme @', join q{ }, $start_of_pause_lexeme, $length_of_pause_lexeme, $lexeme;
+        # say STDERR 'lexeme @', join q{ }, $start_of_pause_lexeme, $length_of_pause_lexeme, $lexeme;
 
-	if ($re->pause_lexeme() eq 'newline') {
-	    # Resume from the end of the last heredoc.
-	    $pos = $re->resume(  $last_heredoc_end // ($start_of_pause_lexeme + $length_of_pause_lexeme) ) ;
-	    $last_heredoc_end = undef;
-	    next PARSE_SEGMENT;
-	}
+        if ( $re->pause_lexeme() eq 'newline' ) {
+
+            # Resume from the end of the last heredoc.
+            $pos =
+                $re->resume( $last_heredoc_end
+                    // ( $start_of_pause_lexeme + $length_of_pause_lexeme ) );
+            $last_heredoc_end = undef;
+            next PARSE_SEGMENT;
+        } ## end if ( $re->pause_lexeme() eq 'newline' )
+
+	# If we are here, the pause lexeme was 'marker'
 
         # Set pos of $input for \G
         pos($input) = $pos;
 
-        # Find the end of the line
-        $last_heredoc_end //= index($input, "\n", $pos) + 1;
-
         # Parse the start of a heredoc
-        my ($name) = ($input =~ m/\G<<(\w+)/msgc);
-            # Save the position where the heredoc marker ends
-            my $last_parse_end = pos($input);
+        my ($name) = ( $input =~ m/\G<<(\w+)/msgc );
 
-            # Set pos of $input to the end of the previous heredoc
-            pos($input) = $last_heredoc_end;
+        # Save the position where the heredoc marker ends
+        my $saved_parse_position = pos $input;
 
-            # Find the literal text between the end of the last heredoc and the marker
-            if (my ($literal) = $input =~ m/\G(.*)^$name\n/gmsc) {
-                # If found, pass the lexemes to the parser so it knows what we found
-                $re->lexeme_read('marker', $pos, 2, '<<') // die $re->show_progress;
-                $re->lexeme_read('literal', $last_heredoc_end, length($literal), $literal) // die $re->show_progress;
+	my $heredoc_start = $last_heredoc_end // (index( $input, "\n", $pos ) + 1);
+        # Set pos of $input to the end of the previous heredoc
+        pos $input = $heredoc_start;
 
-                # Save of the position of the end of the match
-                # The next heredoc literal starts there if there is one
-                $last_heredoc_end = pos($input);
-
-                # Resume parsing from where we last paused
-                $pos = $re->resume($last_parse_end);
-            }
-            else {
-                die "Heredoc marker $name not found before end of input";
-            }
-        }
+        # Find the literal text between the end of the last heredoc and the marker
+        my ($literal) = ($input =~ m/\G(.*)^$name\n/gmsc);
+	die "Heredoc marker $name not found before end of input" if not defined $literal;
 
 
+            # If found, pass the lexemes to the parser so it knows what we found
+            $re->lexeme_read( 'marker', $pos, 2, '<<' )
+                // die $re->show_progress;
+            $re->lexeme_read( 'literal', $heredoc_start, length($literal),
+                $literal ) // die $re->show_progress;
+
+            # Save of the position of the end of the match
+            # The next heredoc literal starts there if there is one
+            $last_heredoc_end = pos $input;
+
+            # Resume parsing from where we last paused
+            $pos = $re->resume($saved_parse_position);
+
+    } ## end PARSE_SEGMENT: while ( $pos < length $input )
 
     my $v = $re->value;
     return $$v;
-}
+} ## end sub parse
 
 1;
