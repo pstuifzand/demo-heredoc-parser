@@ -17,9 +17,9 @@ sub new {
 
 statements    ::= statement+
 
-# Statement should handle their own semi_colons
+# Statement should handle their own semicolons
 
-statement     ::= expressions semi_colon action => ::first
+statement     ::= expressions semicolon action => ::first
                 | newline
 
 expressions   ::= expression+            separator => comma
@@ -37,7 +37,7 @@ heredoc       ::= (<heredoc op>) <heredoc terminator>       action => ::first
 :lexeme         ~ newline    pause => before
 
 <heredoc op>    ~ '<<'
-semi_colon      ~ ';'
+semicolon      ~ ';'
 comma           ~ ','
 newline         ~ [\n]
 
@@ -99,19 +99,20 @@ sub parse {
         my $heredoc_start = $last_heredoc_end
             // ( index( $input, "\n", $pos ) + 1 );
 
-        # Find the literal text between the end of the last heredoc
+        # Find the heredoc body --
+	# the literal text between the end of the last heredoc
 	# and the heredoc terminator for this heredoc
         pos $input = $heredoc_start;
-        my ($literal) = ( $input =~ m/\G(.*)^$terminator\n/gmsc );
+        my ($heredoc_body) = ( $input =~ m/\G(.*)^$terminator\n/gmsc );
         die "Heredoc terminator $terminator not found before end of input"
-            if not defined $literal;
+            if not defined $heredoc_body;
 
         # Pass the heredoc to the parser as the value of <heredoc terminator>
-        $re->lexeme_read( 'heredoc terminator', $heredoc_start, length($literal),
-            $literal ) // die $re->show_progress;
+        $re->lexeme_read( 'heredoc terminator', $heredoc_start, length($heredoc_body),
+            $heredoc_body ) // die $re->show_progress;
 
         # Save of the position of the end of the match
-        # The next heredoc literal starts there if there is one
+        # The next heredoc body starts there if there is one
         $last_heredoc_end = pos $input;
 
         # Resume parsing from the end of the <heredoc terminator> lexeme
