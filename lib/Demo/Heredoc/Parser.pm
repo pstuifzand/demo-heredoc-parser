@@ -41,10 +41,11 @@ marker          ~ '<<'
 semi_colon      ~ ';'
 newline         ~ [\n]
 
-# The literal lexeme will always be provided by the external heredoc scanner So
-# this could be anything.
+# The literal lexeme will always be provided by the external heredoc scanner.
+# Set it to a value which will never match.
 
-literal         ~ [.]
+literal         ~ unicorn
+unicorn         ~ [^\s\S]
 
 comma           ~ ','
 
@@ -76,7 +77,20 @@ sub parse {
     my $last_heredoc_end;
 
     # Loop while the parse has't moved past the end
-    while ($pos < length $input) {
+    PARSE_SEGMENT: while ($pos < length $input) {
+
+	my $lexeme = $re->pause_lexeme() ;
+	my ($start_of_pause_lexeme, $length_of_pause_lexeme) = $re->pause_span();
+
+	say STDERR 'lexeme @', join q{ }, $start_of_pause_lexeme, $length_of_pause_lexeme, $lexeme;
+
+	if ($re->pause_lexeme() eq 'newline') {
+	    # Resume from the end of the last heredoc.
+	    $pos = $re->resume(  $last_heredoc_end // ($start_of_pause_lexeme + $length_of_pause_lexeme) ) ;
+	    $last_heredoc_end = undef;
+	    next PARSE_SEGMENT;
+	}
+
         # Set pos of $input for \G
         pos($input) = $pos;
 
@@ -84,7 +98,7 @@ sub parse {
         $last_heredoc_end //= index($input, "\n", $pos) + 1;
 
         # Parse the start of a heredoc
-        if (my ($name) = $input =~ m/\G<<(\w+)/msgc) {
+        my ($name) = ($input =~ m/\G<<(\w+)/msgc);
             # Save the position where the heredoc marker ends
             my $last_parse_end = pos($input);
 
@@ -108,16 +122,8 @@ sub parse {
                 die "Heredoc marker $name not found before end of input";
             }
         }
-        # Match end of the line
-        elsif ($input =~ m/\G$/gmsc) {
-            # Cleanup for the next line with heredoc markers.
-            my $p = $last_heredoc_end;
-            undef $last_heredoc_end;
 
-            # Resume from the end of the last heredoc.
-            $pos = $re->resume($p);
-        }
-    }
+
 
     my $v = $re->value;
     return $$v;
