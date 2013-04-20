@@ -1,7 +1,9 @@
 package Demo::Heredoc::Parser;
+
 use 5.10.0;
-use Marpa::R2 '2.051_010';
-use Data::Dumper;
+use strict;
+use warnings;
+use Marpa::R2 '2.052000';
 
 sub new {
     my $class = shift;
@@ -15,9 +17,9 @@ sub new {
 
 statements    ::= statement+
 
-# Statement should handle their own semi_colons
+# Statement should handle their own semicolons
 
-statement     ::= expressions semi_colon action => ::first
+statement     ::= expressions semicolon action => ::first
                 | newline
 
 expressions   ::= expression+            separator => comma
@@ -28,23 +30,21 @@ expression    ::= heredoc                action => ::first
 # The heredoc rule is different from how the source code actually looks The
 # pause adverb allows to send only the parts the are useful
 
-heredoc       ::= (marker) literal       action => ::first
+heredoc       ::= (<heredoc op>) <heredoc terminator>       action => ::first
 
-# Pause at the marker and at newlines. Pausing at the newline will
-# actually pause the parser at every newline
-:lexeme         ~ marker     pause => before
+# Pause at <heredoc terminator> and at newlines.
+:lexeme         ~ <heredoc terminator>    pause => before
 :lexeme         ~ newline    pause => before
 
-marker          ~ '<<'
-semi_colon      ~ ';'
+<heredoc op>    ~ '<<'
+semicolon      ~ ';'
+comma           ~ ','
 newline         ~ [\n]
 
-# The literal lexeme will always be provided by the external heredoc scanner So
-# this could be anything.
-
-literal         ~ [.]
-
-comma           ~ ','
+# The syntax here is for the terminator itself.
+# The actual value of the <heredoc terminator> lexeme will
+# the heredoc, which will be provided by the external heredoc scanner.
+<heredoc terminator>         ~ [\w]+
 
 # Only discard horizontal whitespace. If "\n" is included the parser won't
 # pause at the end of line.
@@ -63,62 +63,65 @@ GRAMMAR
 }
 
 sub parse {
-    my ($self, $input) = @_;
+    my ( $self, $input ) = @_;
 
-    my $re = Marpa::R2::Scanless::R->new({ grammar => $self->{grammar} });
+    my $re = Marpa::R2::Scanless::R->new( { grammar => $self->{grammar} } );
 
     # Start the parse
-    my $pos = $re->read(\$input);
+    my $pos = $re->read( \$input );
     die "error" if $pos < 0;
 
     my $last_heredoc_end;
 
     # Loop while the parse has't moved past the end
-    while ($pos < length $input) {
-        # Set pos of $input for \G
-        pos($input) = $pos;
+    PARSE_SEGMENT: while ( $pos < length $input ) {
 
-        # Find the end of the line
-        $last_heredoc_end //= index($input, "\n", $pos) + 1;
+        my $lexeme = $re->pause_lexeme();
+        my ( $start_of_pause_lexeme, $length_of_pause_lexeme ) =
+            $re->pause_span();
+        my $end_of_pause_lexeme = $start_of_pause_lexeme + $length_of_pause_lexeme;
 
-        # Parse the start of a heredoc
-        if (my ($name) = $input =~ m/\G<<(\w+)/msgc) {
-            # Save the position where the heredoc marker ends
-            my $last_parse_end = pos($input);
+        if ( $re->pause_lexeme() eq 'newline' ) {
 
-            # Set pos of $input to the end of the previous heredoc
-            pos($input) = $last_heredoc_end;
+            # Resume from the end of the last heredoc, if there
+            # was one.  Otherwise just resume at the start of the
+            # next line.
+            $pos = $re->resume( $last_heredoc_end // $end_of_pause_lexeme );
+            $last_heredoc_end = undef;
+            next PARSE_SEGMENT;
+        } ## end if ( $re->pause_lexeme() eq 'newline' )
 
-            # Find the literal text between the end of the last heredoc and the marker
-            if (my ($literal) = $input =~ m/\G(.*)^$name\n/gmsc) {
-                # If found, pass the lexemes to the parser so it knows what we found
-                $re->lexeme_read('marker', $pos, 2, '<<') // die $re->show_progress;
-                $re->lexeme_read('literal', $last_heredoc_end, length($literal), $literal) // die $re->show_progress;
+        # If we are here, the pause lexeme was <heredoc terminator>
 
-                # Save of the position of the end of the match
-                # The next heredoc literal starts there if there is one
-                $last_heredoc_end = pos($input);
+        # Find the <heredoc terminator>
+        my $terminator = $re->literal($start_of_pause_lexeme, $length_of_pause_lexeme);
 
-                # Resume parsing from where we last paused
-                $pos = $re->resume($last_parse_end);
-            }
-            else {
-                die "Heredoc marker $name not found before end of input";
-            }
-        }
-        # Match end of the line
-        elsif ($input =~ m/\G$/gmsc) {
-            # Cleanup for the next line with heredoc markers.
-            my $p = $last_heredoc_end;
-            undef $last_heredoc_end;
+        my $heredoc_start = $last_heredoc_end
+            // ( index( $input, "\n", $pos ) + 1 );
 
-            # Resume from the end of the last heredoc.
-            $pos = $re->resume($p);
-        }
-    }
+        # Find the heredoc body --
+	# the literal text between the end of the last heredoc
+	# and the heredoc terminator for this heredoc
+        pos $input = $heredoc_start;
+        my ($heredoc_body) = ( $input =~ m/\G(.*)^$terminator\n/gmsc );
+        die "Heredoc terminator $terminator not found before end of input"
+            if not defined $heredoc_body;
+
+        # Pass the heredoc to the parser as the value of <heredoc terminator>
+        $re->lexeme_read( 'heredoc terminator', $heredoc_start, length($heredoc_body),
+            $heredoc_body ) // die $re->show_progress;
+
+        # Save of the position of the end of the match
+        # The next heredoc body starts there if there is one
+        $last_heredoc_end = pos $input;
+
+        # Resume parsing from the end of the <heredoc terminator> lexeme
+        $pos = $re->resume($end_of_pause_lexeme);
+
+    } ## end PARSE_SEGMENT: while ( $pos < length $input )
 
     my $v = $re->value;
     return $$v;
-}
+} ## end sub parse
 
 1;
