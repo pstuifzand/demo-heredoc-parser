@@ -94,24 +94,19 @@ sub parse {
 
         # If we are here, the pause lexeme was 'marker'
 
-        # Set pos of $input for \G
-        pos($input) = $pos;
-
-        # Parse the start of a heredoc
+        # Find the literal string
         my $name = $re->literal($start_of_pause_lexeme, $length_of_pause_lexeme);
 
         my $heredoc_start = $last_heredoc_end
             // ( index( $input, "\n", $pos ) + 1 );
 
-        # Set pos of $input to the end of the previous heredoc
-        pos $input = $heredoc_start;
-
         # Find the literal text between the end of the last heredoc and the marker
+        pos $input = $heredoc_start;
         my ($literal) = ( $input =~ m/\G(.*)^$name\n/gmsc );
         die "Heredoc marker $name not found before end of input"
             if not defined $literal;
 
-        # Pass the heredoc to the parser as the value of the literal
+        # Pass the heredoc to the parser as the value of 'literal'
         $re->lexeme_read( 'literal', $heredoc_start, length($literal),
             $literal ) // die $re->show_progress;
 
@@ -119,7 +114,7 @@ sub parse {
         # The next heredoc literal starts there if there is one
         $last_heredoc_end = pos $input;
 
-        # Resume parsing from where we last paused
+        # Resume parsing from the end of the 'literal' lexeme
         $pos = $re->resume($end_of_pause_lexeme);
 
     } ## end PARSE_SEGMENT: while ( $pos < length $input )
