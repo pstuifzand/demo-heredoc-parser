@@ -30,21 +30,20 @@ expression    ::= heredoc                action => ::first
 # The heredoc rule is different from how the source code actually looks The
 # pause adverb allows to send only the parts the are useful
 
-heredoc       ::= (marker) <heredoc terminator>       action => ::first
+heredoc       ::= (<heredoc op>) <heredoc terminator>       action => ::first
 
-# Pause at the marker and at newlines. Pausing at the newline will
-# actually pause the parser at every newline
+# Pause at <heredoc terminator> and at newlines.
 :lexeme         ~ <heredoc terminator>    pause => before
 :lexeme         ~ newline    pause => before
 
-marker          ~ '<<'
+<heredoc op>    ~ '<<'
 semi_colon      ~ ';'
 comma           ~ ','
 newline         ~ [\n]
 
+# The syntax here is for the terminator itself.
 # The actual value of the <heredoc terminator> lexeme will
-# be provided by the external heredoc scanner.
-# The syntax here is for the heredoc marker
+# the heredoc, which will be provided by the external heredoc scanner.
 <heredoc terminator>         ~ [\w]+
 
 # Only discard horizontal whitespace. If "\n" is included the parser won't
@@ -92,7 +91,7 @@ sub parse {
             next PARSE_SEGMENT;
         } ## end if ( $re->pause_lexeme() eq 'newline' )
 
-        # If we are here, the pause lexeme was 'marker'
+        # If we are here, the pause lexeme was <heredoc terminator>
 
         # Find the <heredoc terminator>
         my $terminator = $re->literal($start_of_pause_lexeme, $length_of_pause_lexeme);
@@ -100,7 +99,8 @@ sub parse {
         my $heredoc_start = $last_heredoc_end
             // ( index( $input, "\n", $pos ) + 1 );
 
-        # Find the literal text between the end of the last heredoc and the marker
+        # Find the literal text between the end of the last heredoc
+	# and the heredoc terminator for this heredoc
         pos $input = $heredoc_start;
         my ($literal) = ( $input =~ m/\G(.*)^$terminator\n/gmsc );
         die "Heredoc terminator $terminator not found before end of input"
