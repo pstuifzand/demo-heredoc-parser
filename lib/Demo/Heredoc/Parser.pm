@@ -30,11 +30,11 @@ expression    ::= heredoc                action => ::first
 # The heredoc rule is different from how the source code actually looks The
 # pause adverb allows to send only the parts the are useful
 
-heredoc       ::= (marker) literal       action => ::first
+heredoc       ::= (marker) <heredoc terminator>       action => ::first
 
 # Pause at the marker and at newlines. Pausing at the newline will
 # actually pause the parser at every newline
-:lexeme         ~ literal    pause => before
+:lexeme         ~ <heredoc terminator>    pause => before
 :lexeme         ~ newline    pause => before
 
 marker          ~ '<<'
@@ -42,10 +42,10 @@ semi_colon      ~ ';'
 comma           ~ ','
 newline         ~ [\n]
 
-# The actual value of the literal lexeme will
+# The actual value of the <heredoc terminator> lexeme will
 # be provided by the external heredoc scanner.
 # The syntax here is for the heredoc marker
-literal         ~ [\w]+
+<heredoc terminator>         ~ [\w]+
 
 # Only discard horizontal whitespace. If "\n" is included the parser won't
 # pause at the end of line.
@@ -94,27 +94,27 @@ sub parse {
 
         # If we are here, the pause lexeme was 'marker'
 
-        # Find the literal string
-        my $name = $re->literal($start_of_pause_lexeme, $length_of_pause_lexeme);
+        # Find the <heredoc terminator>
+        my $terminator = $re->literal($start_of_pause_lexeme, $length_of_pause_lexeme);
 
         my $heredoc_start = $last_heredoc_end
             // ( index( $input, "\n", $pos ) + 1 );
 
         # Find the literal text between the end of the last heredoc and the marker
         pos $input = $heredoc_start;
-        my ($literal) = ( $input =~ m/\G(.*)^$name\n/gmsc );
-        die "Heredoc marker $name not found before end of input"
+        my ($literal) = ( $input =~ m/\G(.*)^$terminator\n/gmsc );
+        die "Heredoc terminator $terminator not found before end of input"
             if not defined $literal;
 
-        # Pass the heredoc to the parser as the value of 'literal'
-        $re->lexeme_read( 'literal', $heredoc_start, length($literal),
+        # Pass the heredoc to the parser as the value of <heredoc terminator>
+        $re->lexeme_read( 'heredoc terminator', $heredoc_start, length($literal),
             $literal ) // die $re->show_progress;
 
         # Save of the position of the end of the match
         # The next heredoc literal starts there if there is one
         $last_heredoc_end = pos $input;
 
-        # Resume parsing from the end of the 'literal' lexeme
+        # Resume parsing from the end of the <heredoc terminator> lexeme
         $pos = $re->resume($end_of_pause_lexeme);
 
     } ## end PARSE_SEGMENT: while ( $pos < length $input )
