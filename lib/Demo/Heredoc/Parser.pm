@@ -34,7 +34,7 @@ heredoc       ::= (marker) literal       action => ::first
 
 # Pause at the marker and at newlines. Pausing at the newline will
 # actually pause the parser at every newline
-:lexeme         ~ marker     pause => before
+:lexeme         ~ marker     pause => after
 :lexeme         ~ newline    pause => before
 
 marker          ~ '<<'
@@ -101,7 +101,7 @@ sub parse {
         pos($input) = $pos;
 
         # Parse the start of a heredoc
-        my ($name) = ( $input =~ m/\G<<(\w+)/msgc );
+        my ($name) = ( $input =~ m/\G(\w+)/msgc );
 
         # Save the position where the heredoc marker ends
         my $saved_parse_position = pos $input;
@@ -114,10 +114,7 @@ sub parse {
         my ($literal) = ($input =~ m/\G(.*)^$name\n/gmsc);
 	die "Heredoc marker $name not found before end of input" if not defined $literal;
 
-
-            # If found, pass the lexemes to the parser so it knows what we found
-            $re->lexeme_read( 'marker', $pos, 2, '<<' )
-                // die $re->show_progress;
+            # Pass the heredoc to the parser as the value of the literal
             $re->lexeme_read( 'literal', $heredoc_start, length($literal),
                 $literal ) // die $re->show_progress;
 
