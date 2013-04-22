@@ -75,10 +75,8 @@ sub parse {
 
     # Loop while the parse has't moved past the end
     PARSE_SEGMENT: while ( $pos < length $input ) {
-
         my $lexeme = $re->pause_lexeme();
-        my ( $start_of_pause_lexeme, $length_of_pause_lexeme ) =
-            $re->pause_span();
+        my ( $start_of_pause_lexeme, $length_of_pause_lexeme ) = $re->pause_span();
         my $end_of_pause_lexeme = $start_of_pause_lexeme + $length_of_pause_lexeme;
 
         if ( $re->pause_lexeme() eq 'newline' ) {
@@ -100,8 +98,8 @@ sub parse {
             // ( index( $input, "\n", $pos ) + 1 );
 
         # Find the heredoc body --
-	# the literal text between the end of the last heredoc
-	# and the heredoc terminator for this heredoc
+        # the literal text between the end of the last heredoc
+        # and the heredoc terminator for this heredoc
         pos $input = $heredoc_start;
         my ($heredoc_body) = ( $input =~ m/\G(.*)^$terminator\n/gmsc );
         die "Heredoc terminator $terminator not found before end of input"
